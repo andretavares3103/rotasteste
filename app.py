@@ -629,7 +629,7 @@ def pipeline(file_path, output_dir):
         dist_cand = dist_cand[~dist_cand["ID Prestador"].isin(utilizados | set(bloqueados) | profissionais_alocados_por_dia[data_atendimento])]
         dist_cand = dist_cand.sort_values("Distância (km)")
         for _, dist_row in dist_cand.iterrows():
-            if col > 15:
+            if col > 20:
                 break
             id_prof = str(dist_row["ID Prestador"])
             prof = df_profissionais[df_profissionais["ID Prestador"].astype(str).str.strip() == id_prof]
