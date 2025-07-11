@@ -660,7 +660,21 @@ def pipeline(file_path, output_dir):
             utilizados.add(id_prof)
             profissionais_alocados_por_dia[data_atendimento].add(id_prof)
             col += 1
-    
+
+
+        for i in range(1, 21):
+            if f"Classificação da Profissional {i}" not in linha:
+                linha[f"Classificação da Profissional {i}"] = pd.NA
+            if f"Critério {i}" not in linha:
+                linha[f"Critério {i}"] = pd.NA
+            if f"Nome Prestador {i}" not in linha:
+                linha[f"Nome Prestador {i}"] = pd.NA
+            if f"Celular {i}" not in linha:
+                linha[f"Celular {i}"] = pd.NA
+            if f"Mensagem {i}" not in linha:
+                linha[f"Mensagem {i}"] = pd.NA
+            if f"Critério Utilizado {i}" not in linha:
+                linha[f"Critério Utilizado {i}"] = pd.NA    
         matriz_resultado_corrigida.append(linha)
 
 
@@ -675,17 +689,7 @@ def pipeline(file_path, output_dir):
     )
 
     
-    for i in range(1, 21):
-        if f"Classificação da Profissional {i}" not in df_matriz_rotas.columns:
-            df_matriz_rotas[f"Classificação da Profissional {i}"] = pd.NA
-        if f"Critério {i}" not in df_matriz_rotas.columns:
-            df_matriz_rotas[f"Critério {i}"] = pd.NA
-        if f"Nome Prestador {i}" not in df_matriz_rotas.columns:
-            df_matriz_rotas[f"Nome Prestador {i}"] = pd.NA
-        if f"Celular {i}" not in df_matriz_rotas.columns:
-            df_matriz_rotas[f"Celular {i}"] = pd.NA
-        if f"Critério Utilizado {i}" not in df_matriz_rotas.columns:
-            df_matriz_rotas[f"Critério Utilizado {i}"] = pd.NA
+   
     base_cols = [
         "OS", "CPF_CNPJ", "Nome Cliente", "Data 1", "Serviço", "Plano", 
         "Duração do Serviço", "Hora de entrada","Observações prestador", "Ponto de Referencia", "Mensagem Padrão"
