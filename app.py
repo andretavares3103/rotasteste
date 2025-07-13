@@ -998,7 +998,8 @@ if st.button("Entrar", key="btn_senha_global"):
     else:
         st.error("Senha incorreta. Acesso restrito.")
 
-
+if not st.session_state.admin_autenticado:
+    st.stop()
 
 
 # Se autenticado, agora sim mostra TODAS as abas normalmente!
