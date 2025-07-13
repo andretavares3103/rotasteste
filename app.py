@@ -850,6 +850,8 @@ def formatar_data_portugues(data):
 
 PORTAL_EXCEL = "portal_atendimentos_clientes.xlsx"
 PORTAL_OS_LIST = "portal_atendimentos_os_list.json"
+ACEITES_FILE = "aceites.xlsx"
+
 
 # Função para registrar aceite (usada nos cards públicos ANTES da senha)
 def salvar_aceite(os_id, profissional, telefone, aceitou, origem=None):
@@ -902,9 +904,8 @@ if not st.session_state.admin_autenticado:
             os_list = json.load(f)
         df = df[~df["OS"].isna()]  # remove linhas totalmente vazias de OS
         df = df[pd.to_numeric(df["OS"], errors="coerce").isin(os_list)]
-
+    
         # ---- REMOVER OS COM 3+ ACEITES SIM ----
-        ACEITES_FILE = "aceites.xlsx"
         if os.path.exists(ACEITES_FILE):
             df_aceites = pd.read_excel(ACEITES_FILE)
             df_aceites["OS"] = df_aceites["OS"].astype(str).str.strip()
@@ -914,12 +915,14 @@ if not st.session_state.admin_autenticado:
             os_3mais = contagem[contagem >= 3].index.tolist()
             df = df[~df["OS"].astype(str).isin(os_3mais)]
         # ---------------------------------------
-
+    
         if df.empty:
             st.info("Nenhum atendimento disponível.")
         else:
             st.write(f"Exibindo {len(df)} atendimentos selecionados pelo administrador:")
             for _, row in df.iterrows():
+                if not str(row["OS"]).isdigit():
+                    continue  # Pula linhas com OS inválida
                 servico = row.get("Serviço", "")
                 nome_cliente = row.get("Cliente", "")
                 bairro = row.get("Bairro", "")
@@ -928,10 +931,9 @@ if not st.session_state.admin_autenticado:
                 hora_entrada = row.get("Hora de entrada", "")
                 hora_servico = row.get("Horas de serviço", "")
                 referencia = row.get("Ponto de Referencia", "")
-                try:
-                    os_id = int(row["OS"])
-                except (ValueError, TypeError):
-                    continue  # pula esta linha "suja"
+                os_id = int(row["OS"])
+    
+                st.markdown(f""" ...restante do seu código de card... """, unsafe_allow_html=True)
 
 
                 st.markdown(f"""
