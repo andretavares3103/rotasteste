@@ -1305,7 +1305,12 @@ with tabs[0]:
                     hora_entrada = row.get("Hora de entrada", "")
                     hora_servico = row.get("Horas de serviço", "")
                     referencia = row.get("Ponto de Referencia", "")
-                    os_id = int(row["OS"])
+                    os_str = str(row["OS"]).strip()
+                    try:
+                        os_id = int(float(os_str))  # Converte strings como '123.0', '123', ' 0123 ' etc
+                    except Exception:
+                        os_id = os_str  # Se não der pra converter, deixa como string mesmo
+
 
                     st.markdown(f"""
                         <div style="
