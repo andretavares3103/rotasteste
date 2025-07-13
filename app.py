@@ -1374,3 +1374,4 @@ with tabs[0]:
         else:
             st.info("Nenhum atendimento disponível. Aguarde liberação do admin.")
 
+
