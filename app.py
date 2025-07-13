@@ -895,110 +895,87 @@ if not st.session_state.admin_autenticado:
         </p>
     """, unsafe_allow_html=True)
 
-# ---- BLOCO VISUALIZAÇÃO (PÚBLICO) ----
-if os.path.exists(PORTAL_EXCEL) and os.path.exists(PORTAL_OS_LIST):
-    df = pd.read_excel(PORTAL_EXCEL, sheet_name="Clientes")
-    with open(PORTAL_OS_LIST, "r") as f:
-        os_list = json.load(f)
-    df = df[~df["OS"].isna()]  # remove linhas totalmente vazias de OS
-    df = df[pd.to_numeric(df["OS"], errors="coerce").isin(os_list)]
-    
-    # ---- REMOVER OS COM 3+ ACEITES SIM ----
-    ACEITES_FILE = "aceites.xlsx"
-    if os.path.exists(ACEITES_FILE):
-        def padronizar_os_coluna(col):
-            def safe_os(x):
-                try:
-                    return str(int(float(x))).strip()
-                except:
-                    return ""
-            return col.apply(safe_os).astype(str)
-        df_aceites = pd.read_excel(ACEITES_FILE)
-        df_aceites["OS"] = padronizar_os_coluna(df_aceites["OS"])
-        df["OS"] = padronizar_os_coluna(df["OS"])
-        aceites_sim = df_aceites[df_aceites["Aceitou"].astype(str).str.strip().str.lower() == "sim"]
-        contagem = aceites_sim.groupby("OS").size()
-        os_3mais = contagem[contagem >= 3].index.tolist()
-        df = df[~df["OS"].isin(os_3mais)]
-    # --------------------------------------
+    # ---- BLOCO VISUALIZAÇÃO (PÚBLICO) ----
+    if os.path.exists(PORTAL_EXCEL) and os.path.exists(PORTAL_OS_LIST):
+        df = pd.read_excel(PORTAL_EXCEL, sheet_name="Clientes")
+        with open(PORTAL_OS_LIST, "r") as f:
+            os_list = json.load(f)
+        df = df[~df["OS"].isna()]  # remove linhas totalmente vazias de OS
+        df = df[pd.to_numeric(df["OS"], errors="coerce").isin(os_list)]
+        if df.empty:
+            st.info("Nenhum atendimento disponível.")
+        else:
+            st.write(f"Exibindo {len(df)} atendimentos selecionados pelo administrador:")
+            for _, row in df.iterrows():
+                servico = row.get("Serviço", "")
+                nome_cliente = row.get("Cliente", "")
+                bairro = row.get("Bairro", "")
+                data = row.get("Data 1", "")
+                data_pt = formatar_data_portugues(data)
+                hora_entrada = row.get("Hora de entrada", "")
+                hora_servico = row.get("Horas de serviço", "")
+                referencia = row.get("Ponto de Referencia", "")
+                os_id = int(row["OS"])
 
-    if df.empty:
-        st.info("Nenhum atendimento disponível.")
+                st.markdown(f"""
+                    <div style="
+                        background: #fff;
+                        border: 1.5px solid #eee;
+                        border-radius: 18px;
+                        padding: 18px 18px 12px 18px;
+                        margin-bottom: 14px;
+                        min-width: 260px;
+                        max-width: 440px;
+                        color: #00008B;
+                        font-family: Arial, sans-serif;
+                    ">
+                        <div style="font-size:1.2em; font-weight:bold; color:#00008B; margin-bottom:2px;">
+                            {servico}
+                        </div>
+                        <div style="font-size:1em; color:#00008B; margin-bottom:7px;">
+                            <b style="color:#00008B;margin-left:24px">Bairro:</b> <span>{bairro}</span>
+                        </div>
+                        <div style="font-size:0.95em; color:#00008B;">
+                            <b>Data:</b> <span>{data_pt}</span><br>
+                            <b>Hora de entrada:</b> <span>{hora_entrada}</span><br>
+                            <b>Horas de serviço:</b> <span>{hora_servico}</span><br>
+                            <b>Ponto de Referência:</b> <span>{referencia if referencia and referencia != 'nan' else '-'}</span>
+                        </div>
+                    </div>
+                """, unsafe_allow_html=True)
+                expander_style = """
+                <style>
+                /* Aplica fundo verde e texto branco ao expander do Streamlit */
+                div[role="button"][aria-expanded] {
+                    background: #25D366 !important;
+                    color: #fff !important;
+                    border-radius: 10px !important;
+                    font-weight: bold;
+                    font-size: 1.08em;
+                }
+                </style>
+                """
+                st.markdown(expander_style, unsafe_allow_html=True)
+                with st.expander("Tem disponibilidade? Clique aqui para aceitar este atendimento!"):
+                    profissional = st.text_input(f"Nome da Profissional", key=f"prof_nome_{os_id}")
+                    telefone = st.text_input(f"Telefone para contato", key=f"prof_tel_{os_id}")
+                    resposta = st.empty()
+                    if st.button("Sim, tenho interesse neste atendimento.", key=f"btn_real_{os_id}", use_container_width=True):
+                        salvar_aceite(os_id, profissional, telefone, True, origem="portal")
+                        resposta.success("✅ Obrigado! Seu interesse foi registrado com sucesso. Em breve daremos retorno sobre o atendimento!")
     else:
-        st.write(f"Exibindo {len(df)} atendimentos selecionados pelo administrador:")
-        for _, row in df.iterrows():
-            servico = row.get("Serviço", "")
-            nome_cliente = row.get("Cliente", "")
-            bairro = row.get("Bairro", "")
-            data = row.get("Data 1", "")
-            data_pt = formatar_data_portugues(data)
-            hora_entrada = row.get("Hora de entrada", "")
-            hora_servico = row.get("Horas de serviço", "")
-            referencia = row.get("Ponto de Referencia", "")
-            try:
-                os_id = int(float(row["OS"]))  # sempre para int (padronização)
-            except Exception:
-                continue
+        st.info("Nenhum atendimento disponível. Aguarde liberação do admin.")
 
-            st.markdown(f"""
-                <div style="
-                    background: #fff;
-                    border: 1.5px solid #eee;
-                    border-radius: 18px;
-                    padding: 18px 18px 12px 18px;
-                    margin-bottom: 14px;
-                    min-width: 260px;
-                    max-width: 440px;
-                    color: #00008B;
-                    font-family: Arial, sans-serif;
-                ">
-                    <div style="font-size:1.2em; font-weight:bold; color:#00008B; margin-bottom:2px;">
-                        {servico}
-                    </div>
-                    <div style="font-size:1em; color:#00008B; margin-bottom:7px;">
-                        <b style="color:#00008B;margin-left:24px">Bairro:</b> <span>{bairro}</span>
-                    </div>
-                    <div style="font-size:0.95em; color:#00008B;">
-                        <b>Data:</b> <span>{data_pt}</span><br>
-                        <b>Hora de entrada:</b> <span>{hora_entrada}</span><br>
-                        <b>Horas de serviço:</b> <span>{hora_servico}</span><br>
-                        <b>Ponto de Referência:</b> <span>{referencia if referencia and referencia != 'nan' else '-'}</span>
-                    </div>
-                </div>
-            """, unsafe_allow_html=True)
-            expander_style = """
-            <style>
-            /* Aplica fundo verde e texto branco ao expander do Streamlit */
-            div[role="button"][aria-expanded] {
-                background: #25D366 !important;
-                color: #fff !important;
-                border-radius: 10px !important;
-                font-weight: bold;
-                font-size: 1.08em;
-            }
-            </style>
-            """
-            st.markdown(expander_style, unsafe_allow_html=True)
-            with st.expander("Tem disponibilidade? Clique aqui para aceitar este atendimento!"):
-                profissional = st.text_input(f"Nome da Profissional", key=f"prof_nome_{os_id}")
-                telefone = st.text_input(f"Telefone para contato", key=f"prof_tel_{os_id}")
-                resposta = st.empty()
-                if st.button("Sim, tenho interesse neste atendimento.", key=f"btn_real_{os_id}", use_container_width=True):
-                    salvar_aceite(os_id, profissional, telefone, True, origem="portal")
-                    resposta.success("✅ Obrigado! Seu interesse foi registrado com sucesso. Em breve daremos retorno sobre o atendimento!")
-else:
-    st.info("Nenhum atendimento disponível. Aguarde liberação do admin.")
+    # ---- CAMPO DE SENHA para liberar as demais abas ----
+    senha = st.text_input("Área restrita. Digite a senha para liberar as demais abas:", type="password")
+    if st.button("Entrar", key="btn_senha_global"):
+        if senha == "vvv":
+            st.session_state.admin_autenticado = True
+            st.rerun()
+        else:
+            st.error("Senha incorreta. Acesso restrito.")
 
-# ---- CAMPO DE SENHA para liberar as demais abas ----
-senha = st.text_input("Área restrita. Digite a senha para liberar as demais abas:", type="password")
-if st.button("Entrar", key="btn_senha_global"):
-    if senha == "vvv":
-        st.session_state.admin_autenticado = True
-        st.rerun()
-    else:
-        st.error("Senha incorreta. Acesso restrito.")
-
-if not st.session_state.admin_autenticado:
+    # Impede de ver as outras abas
     st.stop()
 
 
