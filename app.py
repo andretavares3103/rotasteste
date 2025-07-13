@@ -1222,13 +1222,76 @@ with tabs[0]:
             else:
                 st.error("Senha incorreta.")
 
-        if st.session_state.admin_autenticado_portal:
-            uploaded_file = st.file_uploader("Faça upload do arquivo Excel", type=["xlsx"], key="portal_upload")
-            if uploaded_file:
-                with open(PORTAL_EXCEL, "wb") as f:
-                    f.write(uploaded_file.getbuffer())
-                st.success("Arquivo salvo! Escolha agora os atendimentos que ficarão visíveis.")
-                df = pd.read_excel(PORTAL_EXCEL, sheet_name="Clientes")
+    if st.session_state.admin_autenticado_portal:
+        # Permite upload OU uso do arquivo em memória/disco
+        uploaded_file = st.file_uploader(
+            "Faça upload do arquivo Excel", 
+            type=["xlsx"], 
+            key="portal_upload"
+        )
+        # Persistência do DataFrame na sessão
+        if "df_portal_clientes" not in st.session_state:
+            st.session_state.df_portal_clientes = None
+    
+        # Novo upload: lê, salva no disco e na sessão
+        if uploaded_file:
+            with open(PORTAL_EXCEL, "wb") as f:
+                f.write(uploaded_file.getbuffer())
+            st.success("Arquivo salvo! Escolha agora os atendimentos que ficarão visíveis.")
+            df = pd.read_excel(PORTAL_EXCEL, sheet_name="Clientes")
+            st.session_state.df_portal_clientes = df
+        # Se já tem DataFrame carregado
+        elif st.session_state.df_portal_clientes is not None:
+            df = st.session_state.df_portal_clientes
+            st.info("Utilizando arquivo já carregado. Se quiser trocar, faça upload de novo arquivo acima.")
+        # Se não, tenta do disco
+        elif os.path.exists(PORTAL_EXCEL):
+            df = pd.read_excel(PORTAL_EXCEL, sheet_name="Clientes")
+            st.session_state.df_portal_clientes = df
+        else:
+            df = None
+    
+        if df is not None:
+            # ------- FILTRO POR DATA1 -------
+            datas_disponiveis = sorted(df["Data 1"].dropna().unique())
+            datas_formatadas = [str(pd.to_datetime(d).date()) for d in datas_disponiveis]
+            datas_selecionadas = st.multiselect(
+                "Filtrar atendimentos por Data",
+                options=datas_formatadas,
+                default=[],
+                key="datas_multiselect"
+            )
+            if datas_selecionadas:
+                df = df[df["Data 1"].astype(str).apply(lambda d: str(pd.to_datetime(d).date()) in datas_selecionadas)]
+    
+            # Monta opções com OS, Cliente, Serviço e Bairro
+            opcoes = [
+                f'OS {int(row.OS)} | {row["Cliente"]} | {row.get("Serviço", "")} | {row.get("Bairro", "")}'
+                for _, row in df.iterrows()
+                if not pd.isnull(row.OS)
+            ]
+            selecionadas = st.multiselect(
+                "Selecione os atendimentos para exibir (OS | Cliente | Serviço | Bairro)",
+                opcoes,
+                key="os_multiselect"
+            )
+    
+            if st.button("Salvar atendimentos exibidos", key="salvar_os_btn"):
+                # Salva apenas a lista de OS selecionadas (extraindo da string)
+                os_ids = [
+                    int(op.split()[1]) for op in selecionadas
+                    if op.startswith("OS ")
+                ]
+                with open(PORTAL_OS_LIST, "w") as f:
+                    json.dump(os_ids, f)
+                st.success("Seleção salva! Agora os atendimentos já ficam disponíveis a todos.")
+                # Resetar flags para voltar tela
+                st.session_state.exibir_admin_portal = False
+                st.session_state.admin_autenticado_portal = False
+                st.rerun()
+        else:
+            st.info("Faça upload ou carregue um arquivo para configurar os atendimentos.")
+
 
                 # ------- FILTRO POR DATA1 -------
                 datas_disponiveis = sorted(df["Data 1"].dropna().unique())
