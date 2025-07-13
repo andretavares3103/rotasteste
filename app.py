@@ -1295,29 +1295,6 @@ with tabs[0]:
             # Só exibe OS selecionadas
             df = df[~df["OS"].isna()]  # remove linhas totalmente vazias de OS
             df = df[pd.to_numeric(df["OS"], errors="coerce").isin(os_list)]
-            
-            # ---- REMOVER OS COM 3+ ACEITES SIM ----
-            ACEITES_FILE = "aceites.xlsx"
-            if os.path.exists(ACEITES_FILE):
-                def padronizar_os_coluna(col):
-                    # Padroniza OS para string inteira SEM decimal (ex: "123")
-                    def safe_os(x):
-                        try:
-                            return str(int(float(x))).strip()
-                        except:
-                            return ""
-                    return col.apply(safe_os).astype(str)
-    
-                df_aceites = pd.read_excel(ACEITES_FILE)
-                df_aceites["OS"] = padronizar_os_coluna(df_aceites["OS"])
-                df["OS"] = padronizar_os_coluna(df["OS"])
-                aceites_sim = df_aceites[df_aceites["Aceitou"].astype(str).str.strip().str.lower() == "sim"]
-                contagem = aceites_sim.groupby("OS").size()
-                os_3mais = contagem[contagem >= 3].index.tolist()
-                # Filtra o DataFrame removendo OS com 3 ou mais aceites
-                df = df[~df["OS"].isin(os_3mais)]
-            # ---------------------------------------
-    
             if df.empty:
                 st.info("Nenhum atendimento disponível.")
             else:
@@ -1330,10 +1307,7 @@ with tabs[0]:
                     hora_entrada = row.get("Hora de entrada", "")
                     hora_servico = row.get("Horas de serviço", "")
                     referencia = row.get("Ponto de Referencia", "")
-                    try:
-                        os_id = int(float(row["OS"]))  # garante inteiro (mesmo se vier como '123.0')
-                    except Exception:
-                        continue
+                    os_id = int(row["OS"])
                     
                     st.markdown(f"""
                         <div style="
