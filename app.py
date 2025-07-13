@@ -928,7 +928,11 @@ if not st.session_state.admin_autenticado:
                 hora_entrada = row.get("Hora de entrada", "")
                 hora_servico = row.get("Horas de serviço", "")
                 referencia = row.get("Ponto de Referencia", "")
-                os_id = int(row["OS"])
+                try:
+                    os_id = int(row["OS"])
+                except (ValueError, TypeError):
+                    continue  # pula esta linha "suja"
+
 
                 st.markdown(f"""
                     <div style="
