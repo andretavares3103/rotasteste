@@ -1295,6 +1295,19 @@ with tabs[0]:
             # Só exibe OS selecionadas
             df = df[~df["OS"].isna()]  # remove linhas totalmente vazias de OS
             df = df[pd.to_numeric(df["OS"], errors="coerce").isin(os_list)]
+    
+            # ---- REMOVER OS COM 3+ ACEITES SIM ----
+            ACEITES_FILE = "aceites.xlsx"
+            if os.path.exists(ACEITES_FILE):
+                df_aceites = pd.read_excel(ACEITES_FILE)
+                df_aceites["OS"] = df_aceites["OS"].astype(str).str.strip()
+                df["OS"] = df["OS"].astype(str).str.strip()
+                aceites_sim = df_aceites[df_aceites["Aceitou"].astype(str).str.lower() == "sim"]
+                contagem = aceites_sim.groupby("OS").size()
+                os_3mais = contagem[contagem >= 3].index.tolist()
+                df = df[~df["OS"].astype(str).isin(os_3mais)]
+            # ---------------------------------------
+    
             if df.empty:
                 st.info("Nenhum atendimento disponível.")
             else:
@@ -1307,7 +1320,10 @@ with tabs[0]:
                     hora_entrada = row.get("Hora de entrada", "")
                     hora_servico = row.get("Horas de serviço", "")
                     referencia = row.get("Ponto de Referencia", "")
-                    os_id = int(row["OS"])
+                    try:
+                        os_id = int(float(row["OS"]))
+                    except (ValueError, TypeError):
+                        continue  # pula linhas sem OS válida
                     
                     st.markdown(f"""
                         <div style="
