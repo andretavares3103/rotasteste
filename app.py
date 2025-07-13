@@ -1194,6 +1194,9 @@ import urllib.parse
 
 
 with tabs[0]:
+    import json
+    import os
+
     st.markdown("""
         <div style='display:flex;align-items:center;gap:16px'>
             <img src='https://i.imgur.com/gIhC0fC.png' height='48'>
@@ -1214,7 +1217,7 @@ with tabs[0]:
     if st.button("Acesso admin para editar atendimentos do portal"):
         st.session_state.exibir_admin_portal = True
 
-    # ---- BLOCO ADMIN ----
+    # BLOCO ADMIN
     if st.session_state.exibir_admin_portal:
         senha = st.text_input("Digite a senha de administrador", type="password", key="senha_portal_admin")
         if st.button("Validar senha", key="btn_validar_senha_portal"):
@@ -1224,13 +1227,25 @@ with tabs[0]:
                 st.error("Senha incorreta.")
 
         if st.session_state.admin_autenticado_portal:
+            # Permite upload OU reutilização do arquivo salvo
             uploaded_file = st.file_uploader("Faça upload do arquivo Excel", type=["xlsx"], key="portal_upload")
+            use_last_file = False
+            if os.path.exists(PORTAL_EXCEL):
+                st.info("Você pode reutilizar o último arquivo salvo sem novo upload.")
+                if st.button("Usar último arquivo salvo para editar/exibir atendimentos"):
+                    use_last_file = True
+
             if uploaded_file:
                 with open(PORTAL_EXCEL, "wb") as f:
                     f.write(uploaded_file.getbuffer())
                 st.success("Arquivo salvo! Escolha agora os atendimentos que ficarão visíveis.")
                 df = pd.read_excel(PORTAL_EXCEL, sheet_name="Clientes")
+            elif use_last_file and os.path.exists(PORTAL_EXCEL):
+                df = pd.read_excel(PORTAL_EXCEL, sheet_name="Clientes")
+            else:
+                df = None
 
+            if df is not None:
                 # ------- FILTRO POR DATA1 -------
                 datas_disponiveis = sorted(df["Data 1"].dropna().unique())
                 datas_formatadas = [str(pd.to_datetime(d).date()) for d in datas_disponiveis]
@@ -1242,7 +1257,6 @@ with tabs[0]:
                 )
                 if datas_selecionadas:
                     df = df[df["Data 1"].astype(str).apply(lambda d: str(pd.to_datetime(d).date()) in datas_selecionadas)]
-
 
                 # Monta opções com OS, Cliente, Serviço e Bairro
                 opcoes = [
@@ -1268,18 +1282,29 @@ with tabs[0]:
                     st.session_state.admin_autenticado_portal = False
                     st.rerun()
 
-    # ---- BLOCO VISUALIZAÇÃO (PÚBLICO) ----
+    # BLOCO VISUALIZAÇÃO (PÚBLICO)
     if not st.session_state.exibir_admin_portal:
         if os.path.exists(PORTAL_EXCEL) and os.path.exists(PORTAL_OS_LIST):
             df = pd.read_excel(PORTAL_EXCEL, sheet_name="Clientes")
             with open(PORTAL_OS_LIST, "r") as f:
                 os_list = json.load(f)
-            # Só exibe OS selecionadas
             df = df[~df["OS"].isna()]  # remove linhas totalmente vazias de OS
             df = df[pd.to_numeric(df["OS"], errors="coerce").isin(os_list)]
             if df.empty:
                 st.info("Nenhum atendimento disponível.")
             else:
+                # ------ FILTRO AUTOMÁTICO: Remove OS com 3+ aceites "Sim" ------
+                ACEITES_FILE = "aceites.xlsx"
+                if os.path.exists(ACEITES_FILE):
+                    df_aceites = pd.read_excel(ACEITES_FILE)
+                    df_aceites["OS"] = df_aceites["OS"].astype(str).str.strip()
+                    df["OS"] = df["OS"].astype(str).str.strip()
+                    aceites_sim = df_aceites[df_aceites["Aceitou"].astype(str).str.lower() == "sim"]
+                    contagem = aceites_sim.groupby("OS").size()
+                    os_3mais = contagem[contagem >= 3].index.tolist()
+                    df = df[~df["OS"].astype(str).isin(os_3mais)]
+                # ------------------------------------------
+
                 st.write(f"Exibindo {len(df)} atendimentos selecionados pelo administrador:")
                 for _, row in df.iterrows():
                     servico = row.get("Serviço", "")
@@ -1340,63 +1365,6 @@ with tabs[0]:
                             salvar_aceite(os_id, profissional, telefone, True, origem="portal")
                             resposta.success("✅ Obrigado! Seu interesse foi registrado com sucesso. Em breve daremos retorno sobre o atendimento!")
 
-
         else:
             st.info("Nenhum atendimento disponível. Aguarde liberação do admin.")
-
-with tabs[4]:
-        st.subheader("Buscar Profissionais Próximos")
-        lat = st.number_input("Latitude", value=-19.9, format="%.6f")
-        lon = st.number_input("Longitude", value=-43.9, format="%.6f")
-        n = st.number_input("Qtd. profissionais", min_value=1, value=5, step=1)
-        if st.button("Buscar"):
-            # Usa o df_profissionais já tratado do pipeline
-            if os.path.exists(ROTAS_FILE):
-                df_profissionais = pd.read_excel(ROTAS_FILE, sheet_name="Profissionais")
-                mask_inativo_nome = df_profissionais['Nome Prestador'].astype(str).str.contains('inativo', case=False, na=False)
-                df_profissionais = df_profissionais[~mask_inativo_nome]
-                df_profissionais = df_profissionais.dropna(subset=['Latitude Profissional', 'Longitude Profissional'])
-                input_coords = (lat, lon)
-                df_profissionais['Distância_km'] = df_profissionais.apply(
-                    lambda row: geodesic(input_coords, (row['Latitude Profissional'], row['Longitude Profissional'])).km, axis=1
-                )
-                df_melhores = df_profissionais.sort_values('Distância_km').head(int(n))
-                st.dataframe(df_melhores[['Nome Prestador', 'Celular', 'Qtd Atendimentos', 'Latitude Profissional', 'Longitude Profissional', 'Distância_km']])
-            else:
-                st.info("Faça upload e processamento do arquivo para habilitar a busca.")
-    
-# Aba "Mensagem Rápida"
-with tabs[5]:
-    st.subheader("Gerar Mensagem Rápida WhatsApp")
-    os_id = st.text_input("Código da OS* (obrigatório)", max_chars=12)
-    data = st.text_input("Data do Atendimento (ex: 20/06/2025)")
-    bairro = st.text_input("Bairro")
-    servico = st.text_input("Serviço")
-    hora_entrada = st.text_input("Hora de entrada (ex: 08:00)")
-    duracao = st.text_input("Duração do atendimento (ex: 2h)")
-
-    app_url = "https://rotasvavive.streamlit.app"  # sua URL real
-    if os_id.strip():
-        link_aceite = f"{app_url}?aceite={os_id}&origem=mensagem_rapida"
-    else:
-        link_aceite = ""
-
-    if st.button("Gerar Mensagem"):
-        if not os_id.strip():
-            st.error("Preencha o código da OS!")
-        else:
-            mensagem = (
-                "🚨🚨🚨\n"
-                "     *Oportunidade Relâmpago*\n"
-                "                              🚨🚨🚨\n\n"
-                f"Olá, tudo bem com você?\n\n"
-                f"*Data:* {data}\n"
-                f"*Bairro:* {bairro}\n"
-                f"*Serviço:* {servico}\n"
-                f"*Hora de entrada:* {hora_entrada}\n"
-                f"*Duração do atendimento:* {duracao}\n\n"
-                f"👉 Para aceitar ou recusar, acesse: {link_aceite}\n\n"
-                "Se tiver interesse, por favor, nos avise!"
-            )
-            st.text_area("Mensagem WhatsApp", value=mensagem, height=260)
 
