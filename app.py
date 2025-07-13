@@ -1,4 +1,4 @@
-
+#
 
 import streamlit as st
 import pandas as pd
@@ -1199,18 +1199,18 @@ with tabs[0]:
         </p>
         """, unsafe_allow_html=True)
 
-    # Inicialização dos controles
+    # Controle de exibição e autenticação admin
     if "exibir_admin_portal" not in st.session_state:
         st.session_state.exibir_admin_portal = False
     if "admin_autenticado_portal" not in st.session_state:
         st.session_state.admin_autenticado_portal = False
 
-    # Botão para admin
+    # Botão para mostrar a área admin
     if st.button("Acesso admin para editar atendimentos do portal"):
         st.session_state.exibir_admin_portal = True
 
-    # ---- BLOCO ADMIN (aberto quando botão clicado OU senha validada) ----
-    if st.session_state.exibir_admin_portal or st.session_state.admin_autenticado_portal:
+    # ---- BLOCO ADMIN ----
+    if st.session_state.exibir_admin_portal:
         senha = st.text_input("Digite a senha de administrador", type="password", key="senha_portal_admin")
         if st.button("Validar senha", key="btn_validar_senha_portal"):
             if senha == "vvv":
@@ -1225,6 +1225,8 @@ with tabs[0]:
                     f.write(uploaded_file.getbuffer())
                 st.success("Arquivo salvo! Escolha agora os atendimentos que ficarão visíveis.")
                 df = pd.read_excel(PORTAL_EXCEL, sheet_name="Clientes")
+
+                # ------- FILTRO POR DATA1 -------
                 datas_disponiveis = sorted(df["Data 1"].dropna().unique())
                 datas_formatadas = [str(pd.to_datetime(d).date()) for d in datas_disponiveis]
                 datas_selecionadas = st.multiselect(
@@ -1235,6 +1237,9 @@ with tabs[0]:
                 )
                 if datas_selecionadas:
                     df = df[df["Data 1"].astype(str).apply(lambda d: str(pd.to_datetime(d).date()) in datas_selecionadas)]
+
+
+                # Monta opções com OS, Cliente, Serviço e Bairro
                 opcoes = [
                     f'OS {int(row.OS)} | {row["Cliente"]} | {row.get("Serviço", "")} | {row.get("Bairro", "")}'
                     for _, row in df.iterrows()
@@ -1246,6 +1251,7 @@ with tabs[0]:
                     key="os_multiselect"
                 )
                 if st.button("Salvar atendimentos exibidos", key="salvar_os_btn"):
+                    # Para salvar apenas a lista de OS selecionadas (extraindo da string)
                     os_ids = [
                         int(op.split()[1]) for op in selecionadas
                         if op.startswith("OS ")
@@ -1257,46 +1263,20 @@ with tabs[0]:
                     st.session_state.admin_autenticado_portal = False
                     st.rerun()
 
-    # ---- BLOCO PÚBLICO (apenas quando NÃO está no admin nem autenticado) ----
-    if not st.session_state.exibir_admin_portal and not st.session_state.admin_autenticado_portal:
+    # ---- BLOCO VISUALIZAÇÃO (PÚBLICO) ----
+    if not st.session_state.exibir_admin_portal:
         if os.path.exists(PORTAL_EXCEL) and os.path.exists(PORTAL_OS_LIST):
             df = pd.read_excel(PORTAL_EXCEL, sheet_name="Clientes")
             with open(PORTAL_OS_LIST, "r") as f:
                 os_list = json.load(f)
-            df = df[~df["OS"].isna()]
+            # Só exibe OS selecionadas
+            df = df[~df["OS"].isna()]  # remove linhas totalmente vazias de OS
             df = df[pd.to_numeric(df["OS"], errors="coerce").isin(os_list)]
-
-            # >>> FILTRO PARA OCULTAR OS COM 3+ ACEITES DE ORIGEM 'PORTAL' <<<
-            if os.path.exists("aceites.xlsx"):
-                df_aceites = pd.read_excel("aceites.xlsx")
-                def limpa_os(val):
-                    try:
-                        return str(int(float(str(val).strip())))
-                    except:
-                        return str(val).strip()
-                df_aceites["OS"] = df_aceites["OS"].apply(limpa_os)
-                df["OS"] = df["OS"].apply(limpa_os)
-                filtro = (
-                    df_aceites["Aceitou"].astype(str).str.strip().str.lower() == "sim"
-                ) & (
-                    df_aceites["Origem"].astype(str).str.strip().str.lower() == "portal"
-                )
-                contagem = df_aceites[filtro].groupby("OS").size()
-                os_remover = contagem[contagem >= 3].index.tolist()
-                df = df[~df["OS"].isin(os_remover)]
-            # <<< FIM DO FILTRO >>>
-
             if df.empty:
                 st.info("Nenhum atendimento disponível.")
             else:
                 st.write(f"Exibindo {len(df)} atendimentos selecionados pelo administrador:")
                 for _, row in df.iterrows():
-                    os_str = str(row["OS"]).strip()
-                    try:
-                        os_id = int(float(os_str))
-                    except Exception:
-                        os_id = os_str
-
                     servico = row.get("Serviço", "")
                     nome_cliente = row.get("Cliente", "")
                     bairro = row.get("Bairro", "")
@@ -1304,7 +1284,8 @@ with tabs[0]:
                     hora_entrada = row.get("Hora de entrada", "")
                     hora_servico = row.get("Horas de serviço", "")
                     referencia = row.get("Ponto de Referencia", "")
-
+                    os_id = int(row["OS"])
+                    
                     st.markdown(f"""
                         <div style="
                             background: #fff;
@@ -1331,9 +1312,10 @@ with tabs[0]:
                             </div>
                         </div>
                     """, unsafe_allow_html=True)
-
+                    
                     expander_style = """
                     <style>
+                    /* Aplica fundo verde e texto branco ao expander do Streamlit */
                     div[role="button"][aria-expanded] {
                         background: #25D366 !important;
                         color: #fff !important;
@@ -1344,7 +1326,7 @@ with tabs[0]:
                     </style>
                     """
                     st.markdown(expander_style, unsafe_allow_html=True)
-
+                    
                     with st.expander("Tem disponibilidade? Clique aqui para aceitar este atendimento!"):
                         profissional = st.text_input(f"Nome da Profissional", key=f"prof_nome_{os_id}")
                         telefone = st.text_input(f"Telefone para contato", key=f"prof_tel_{os_id}")
@@ -1352,11 +1334,10 @@ with tabs[0]:
                         if st.button("Sim, tenho interesse neste atendimento.", key=f"btn_real_{os_id}", use_container_width=True):
                             salvar_aceite(os_id, profissional, telefone, True, origem="portal")
                             resposta.success("✅ Obrigado! Seu interesse foi registrado com sucesso. Em breve daremos retorno sobre o atendimento!")
+
+
         else:
             st.info("Nenhum atendimento disponível. Aguarde liberação do admin.")
-
-
-
 
 with tabs[4]:
         st.subheader("Buscar Profissionais Próximos")
@@ -1389,7 +1370,7 @@ with tabs[5]:
     hora_entrada = st.text_input("Hora de entrada (ex: 08:00)")
     duracao = st.text_input("Duração do atendimento (ex: 2h)")
 
-    app_url = "https://rotasteste-c9dzzfhuuhwv7ongodgrpq.streamlit.app"  # sua URL real
+    app_url = "https://rotasteste.streamlit.app"  # sua URL real
     if os_id.strip():
         link_aceite = f"{app_url}?aceite={os_id}&origem=mensagem_rapida"
     else:
@@ -1413,4 +1394,3 @@ with tabs[5]:
                 "Se tiver interesse, por favor, nos avise!"
             )
             st.text_area("Mensagem WhatsApp", value=mensagem, height=260)
-
