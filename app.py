@@ -1278,7 +1278,15 @@ with tabs[0]:
                     for _, row in df.iterrows()
                     if not pd.isnull(row.OS)
                 ]
-                opcoes_ids = [int(str(row.OS)) for _, row in df.iterrows() if not pd.isnull(row.OS)]
+                opcoes_ids = []
+                for _, row in df.iterrows():
+                    try:
+                        os_id = int(float(row.OS))
+                        opcoes_ids.append(os_id)
+                    except (ValueError, TypeError):
+                        continue
+
+
     
                 # Atendimentos já marcados na última seleção
                 selecionadas_default = [
