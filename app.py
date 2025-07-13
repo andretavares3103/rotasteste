@@ -1297,7 +1297,7 @@ with tabs[0]:
                 if st.button("Sair do modo admin"):
                     st.session_state.exibir_admin_portal = False
                     st.session_state.admin_autenticado_portal = False
-                    st.rerun()
+                    st.experimental_rerun()
 
 
 
