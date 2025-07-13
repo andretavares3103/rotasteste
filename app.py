@@ -1223,53 +1223,45 @@ with tabs[0]:
                 st.error("Senha incorreta.")
 
     if st.session_state.admin_autenticado_portal:
-        # Controle do arquivo carregado: prioriza o último salvo se não fizer upload novo
+        # Permite upload OU reutilização do arquivo salvo
         if "portal_file_buffer" not in st.session_state:
             st.session_state.portal_file_buffer = None
     
         uploaded_file = st.file_uploader("Faça upload do arquivo Excel", type=["xlsx"], key="portal_upload")
         use_last_file = False
-        if os.path.exists(PORTAL_EXCEL):
-            st.info("Você pode reutilizar o último arquivo salvo sem novo upload.")
-            if st.button("Usar último arquivo salvo para editar/exibir atendimentos", key="btn_usar_ultimo_arquivo"):
-                use_last_file = True
     
-        # Se fizer upload novo, salva no disco e no session_state
         if uploaded_file:
-            with open(PORTAL_EXCEL, "wb") as f:
-                f.write(uploaded_file.getbuffer())
+            # Salva arquivo na sessão e disco
             st.session_state.portal_file_buffer = uploaded_file.getbuffer()
-            st.success("Arquivo salvo! Escolha agora os atendimentos que ficarão visíveis.")
-            df = pd.read_excel(PORTAL_EXCEL, sheet_name="Clientes")
-        elif use_last_file and os.path.exists(PORTAL_EXCEL):
-            df = pd.read_excel(PORTAL_EXCEL, sheet_name="Clientes")
-        elif st.session_state.portal_file_buffer:
-            # Recupera do buffer se não houve novo upload nem pediu o último salvo
             with open(PORTAL_EXCEL, "wb") as f:
                 f.write(st.session_state.portal_file_buffer)
+            st.success("Arquivo salvo! Escolha agora os atendimentos que ficarão visíveis.")
+            df = pd.read_excel(PORTAL_EXCEL, sheet_name="Clientes")
+        elif st.session_state.portal_file_buffer:
+            # Usa o arquivo já carregado na sessão
+            with open(PORTAL_EXCEL, "wb") as f:
+                f.write(st.session_state.portal_file_buffer)
+            df = pd.read_excel(PORTAL_EXCEL, sheet_name="Clientes")
+        elif os.path.exists(PORTAL_EXCEL):
+            # Usa o arquivo salvo no disco
             df = pd.read_excel(PORTAL_EXCEL, sheet_name="Clientes")
         else:
             df = None
     
         if df is not None:
-            # ---- Mantém filtros anteriores ----
-            if "portal_datas_selecionadas" not in st.session_state:
-                st.session_state.portal_datas_selecionadas = []
-            if "portal_atendimentos_selecionados" not in st.session_state:
-                st.session_state.portal_atendimentos_selecionados = []
-    
+            # ------- FILTRO POR DATA1 -------
             datas_disponiveis = sorted(df["Data 1"].dropna().unique())
             datas_formatadas = [str(pd.to_datetime(d).date()) for d in datas_disponiveis]
-    
             datas_selecionadas = st.multiselect(
                 "Filtrar atendimentos por Data",
                 options=datas_formatadas,
-                default=st.session_state.portal_datas_selecionadas,
+                default=[],
                 key="datas_multiselect"
             )
             if datas_selecionadas:
                 df = df[df["Data 1"].astype(str).apply(lambda d: str(pd.to_datetime(d).date()) in datas_selecionadas)]
     
+            # Monta opções com OS, Cliente, Serviço e Bairro
             opcoes = [
                 f'OS {int(row.OS)} | {row["Cliente"]} | {row.get("Serviço", "")} | {row.get("Bairro", "")}'
                 for _, row in df.iterrows()
@@ -1278,24 +1270,20 @@ with tabs[0]:
             selecionadas = st.multiselect(
                 "Selecione os atendimentos para exibir (OS | Cliente | Serviço | Bairro)",
                 opcoes,
-                default=st.session_state.portal_atendimentos_selecionados,
                 key="os_multiselect"
             )
-    
             if st.button("Salvar atendimentos exibidos", key="salvar_os_btn"):
+                # Para salvar apenas a lista de OS selecionadas (extraindo da string)
                 os_ids = [
                     int(op.split()[1]) for op in selecionadas
                     if op.startswith("OS ")
                 ]
                 with open(PORTAL_OS_LIST, "w") as f:
                     json.dump(os_ids, f)
-                st.session_state.portal_datas_selecionadas = datas_selecionadas
-                st.session_state.portal_atendimentos_selecionados = selecionadas
                 st.success("Seleção salva! Agora os atendimentos já ficam disponíveis a todos.")
                 st.session_state.exibir_admin_portal = False
                 st.session_state.admin_autenticado_portal = False
                 st.rerun()
-
 
 
     # ---- BLOCO VISUALIZAÇÃO (PÚBLICO) ----
@@ -1429,4 +1417,3 @@ with tabs[5]:
                 "Se tiver interesse, por favor, nos avise!"
             )
             st.text_area("Mensagem WhatsApp", value=mensagem, height=260)
-
