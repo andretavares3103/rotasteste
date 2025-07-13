@@ -1238,7 +1238,6 @@ with tabs[0]:
                 if datas_selecionadas:
                     df = df[df["Data 1"].astype(str).apply(lambda d: str(pd.to_datetime(d).date()) in datas_selecionadas)]
 
-
                 # Monta opções com OS, Cliente, Serviço e Bairro
                 opcoes = [
                     f'OS {int(row.OS)} | {row["Cliente"]} | {row.get("Serviço", "")} | {row.get("Bairro", "")}'
@@ -1272,6 +1271,22 @@ with tabs[0]:
             # Só exibe OS selecionadas
             df = df[~df["OS"].isna()]  # remove linhas totalmente vazias de OS
             df = df[pd.to_numeric(df["OS"], errors="coerce").isin(os_list)]
+
+            # >>>>>>>>>>>> FILTRO PARA ESCONDER OS COM 3+ ACEITES 'portal' <<<<<<<<<<<
+            if os.path.exists("aceites.xlsx"):
+                df_aceites = pd.read_excel("aceites.xlsx")
+                df_aceites["OS"] = df_aceites["OS"].astype(str).str.strip()
+                # Aceites 'Sim' de origem 'portal'
+                filtro = (
+                    df_aceites["Aceitou"].astype(str).str.strip().str.lower() == "sim"
+                ) & (
+                    df_aceites["Origem"].astype(str).str.strip().str.lower() == "portal"
+                )
+                contagem = df_aceites[filtro].groupby("OS").size()
+                # Remove do DataFrame as OS com 3 ou mais aceites
+                df = df[~df["OS"].astype(str).isin(contagem[contagem >= 3].index)]
+            # <<<<<<<<<<<<<<< FIM DO FILTRO <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+
             if df.empty:
                 st.info("Nenhum atendimento disponível.")
             else:
@@ -1285,7 +1300,7 @@ with tabs[0]:
                     hora_servico = row.get("Horas de serviço", "")
                     referencia = row.get("Ponto de Referencia", "")
                     os_id = int(row["OS"])
-                    
+
                     st.markdown(f"""
                         <div style="
                             background: #fff;
@@ -1312,10 +1327,9 @@ with tabs[0]:
                             </div>
                         </div>
                     """, unsafe_allow_html=True)
-                    
+
                     expander_style = """
                     <style>
-                    /* Aplica fundo verde e texto branco ao expander do Streamlit */
                     div[role="button"][aria-expanded] {
                         background: #25D366 !important;
                         color: #fff !important;
@@ -1326,7 +1340,7 @@ with tabs[0]:
                     </style>
                     """
                     st.markdown(expander_style, unsafe_allow_html=True)
-                    
+
                     with st.expander("Tem disponibilidade? Clique aqui para aceitar este atendimento!"):
                         profissional = st.text_input(f"Nome da Profissional", key=f"prof_nome_{os_id}")
                         telefone = st.text_input(f"Telefone para contato", key=f"prof_tel_{os_id}")
@@ -1334,10 +1348,9 @@ with tabs[0]:
                         if st.button("Sim, tenho interesse neste atendimento.", key=f"btn_real_{os_id}", use_container_width=True):
                             salvar_aceite(os_id, profissional, telefone, True, origem="portal")
                             resposta.success("✅ Obrigado! Seu interesse foi registrado com sucesso. Em breve daremos retorno sobre o atendimento!")
-
-
         else:
             st.info("Nenhum atendimento disponível. Aguarde liberação do admin.")
+
 
 with tabs[4]:
         st.subheader("Buscar Profissionais Próximos")
