@@ -1276,20 +1276,26 @@ with tabs[0]:
             if os.path.exists("aceites.xlsx"):
                 df_aceites = pd.read_excel("aceites.xlsx")
             
-                # Padronize a coluna OS dos dois DataFrames para string SEM espaços nem zeros à esquerda
-                df_aceites["OS"] = df_aceites["OS"].astype(str).str.strip().str.lstrip("0")
-                df["OS"] = df["OS"].astype(str).str.strip().str.lstrip("0")
+                # Padroniza OS como string sem espaços e sem zeros à esquerda
+                def limpa_os(val):
+                    try:
+                        return str(int(float(str(val).strip())))
+                    except:
+                        return str(val).strip()
             
-                # Aceites 'Sim' de origem 'portal'
+                df_aceites["OS"] = df_aceites["OS"].apply(limpa_os)
+                df["OS"] = df["OS"].apply(limpa_os)
+            
+                # Conta só aceites SIM e origem 'portal'
                 filtro = (
                     df_aceites["Aceitou"].astype(str).str.strip().str.lower() == "sim"
                 ) & (
                     df_aceites["Origem"].astype(str).str.strip().str.lower() == "portal"
                 )
                 contagem = df_aceites[filtro].groupby("OS").size()
-                # Remove do DataFrame as OS com 3 ou mais aceites
                 os_remover = contagem[contagem >= 3].index.tolist()
                 df = df[~df["OS"].isin(os_remover)]
+
 
             # <<<<<<<<<<<<<<< FIM DO FILTRO <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
 
