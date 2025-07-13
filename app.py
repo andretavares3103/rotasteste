@@ -1207,13 +1207,11 @@ with tabs[0]:
         </p>
         """, unsafe_allow_html=True)
 
-    # Controle de exibição e autenticação admin
     if "exibir_admin_portal" not in st.session_state:
         st.session_state.exibir_admin_portal = False
     if "admin_autenticado_portal" not in st.session_state:
         st.session_state.admin_autenticado_portal = False
 
-    # Botão para mostrar a área admin
     if st.button("Acesso admin para editar atendimentos do portal"):
         st.session_state.exibir_admin_portal = True
 
@@ -1227,7 +1225,6 @@ with tabs[0]:
                 st.error("Senha incorreta.")
 
         if st.session_state.admin_autenticado_portal:
-            # Permite upload OU reutilização do arquivo salvo
             uploaded_file = st.file_uploader("Faça upload do arquivo Excel", type=["xlsx"], key="portal_upload")
             use_last_file = False
             if os.path.exists(PORTAL_EXCEL):
@@ -1245,32 +1242,53 @@ with tabs[0]:
             else:
                 df = None
 
+            # ------ BLOCO: Preenche seleção anterior automaticamente ------
+            ultimas_os_ids = []
+            if os.path.exists(PORTAL_OS_LIST):
+                try:
+                    with open(PORTAL_OS_LIST, "r") as f:
+                        ultimas_os_ids = json.load(f)
+                except Exception:
+                    ultimas_os_ids = []
+
             if df is not None:
-                # ------- FILTRO POR DATA1 -------
+                # --- Datas disponíveis
                 datas_disponiveis = sorted(df["Data 1"].dropna().unique())
                 datas_formatadas = [str(pd.to_datetime(d).date()) for d in datas_disponiveis]
+                # Datas já selecionadas da última OS list
+                ultimas_datas_selecionadas = []
+                if ultimas_os_ids:
+                    datas_os = df[df["OS"].astype(str).isin([str(i) for i in ultimas_os_ids])]["Data 1"].dropna().unique()
+                    ultimas_datas_selecionadas = list({str(pd.to_datetime(d).date()) for d in datas_os})
+
                 datas_selecionadas = st.multiselect(
                     "Filtrar atendimentos por Data",
                     options=datas_formatadas,
-                    default=[],
+                    default=ultimas_datas_selecionadas,
                     key="datas_multiselect"
                 )
                 if datas_selecionadas:
                     df = df[df["Data 1"].astype(str).apply(lambda d: str(pd.to_datetime(d).date()) in datas_selecionadas)]
 
-                # Monta opções com OS, Cliente, Serviço e Bairro
+                # --- Monta opções de atendimentos já marcados na última seleção
                 opcoes = [
                     f'OS {int(row.OS)} | {row["Cliente"]} | {row.get("Serviço", "")} | {row.get("Bairro", "")}'
                     for _, row in df.iterrows()
                     if not pd.isnull(row.OS)
                 ]
+                opcoes_ids = [int(str(row.OS)) for _, row in df.iterrows() if not pd.isnull(row.OS)]
+
+                selecionadas_default = [
+                    opcoes[i] for i, osid in enumerate(opcoes_ids) if osid in ultimas_os_ids
+                ]
+
                 selecionadas = st.multiselect(
                     "Selecione os atendimentos para exibir (OS | Cliente | Serviço | Bairro)",
                     opcoes,
+                    default=selecionadas_default,
                     key="os_multiselect"
                 )
                 if st.button("Salvar atendimentos exibidos", key="salvar_os_btn"):
-                    # Para salvar apenas a lista de OS selecionadas (extraindo da string)
                     os_ids = [
                         int(op.split()[1]) for op in selecionadas
                         if op.startswith("OS ")
@@ -1345,7 +1363,6 @@ with tabs[0]:
                     
                     expander_style = """
                     <style>
-                    /* Aplica fundo verde e texto branco ao expander do Streamlit */
                     div[role="button"][aria-expanded] {
                         background: #25D366 !important;
                         color: #fff !important;
@@ -1367,4 +1384,3 @@ with tabs[0]:
 
         else:
             st.info("Nenhum atendimento disponível. Aguarde liberação do admin.")
-
