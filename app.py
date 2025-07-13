@@ -983,33 +983,54 @@ if not st.session_state.admin_autenticado:
 tabs = st.tabs(["Portal Atendimentos", "Upload de Arquivo", "Matriz de Rotas", "Aceites", "Profissionais Próximos", "Mensagem Rápida"])
 
 with tabs[1]:
+    # Permite upload do arquivo
+    uploaded_file = st.file_uploader("Selecione o arquivo Excel original", type=["xlsx"], key="uploader_rotas")
 
-    
-    uploaded_file = st.file_uploader("Selecione o arquivo Excel original", type=["xlsx"])
+    # Checa se o arquivo já foi processado na sessão
+    if "rotas_uploaded_name" not in st.session_state:
+        st.session_state["rotas_uploaded_name"] = None
+    if "rotas_processed" not in st.session_state:
+        st.session_state["rotas_processed"] = False
+
+    # Processa só se for um arquivo novo
     if uploaded_file:
-        with st.spinner("Processando... Isso pode levar alguns segundos."):
-            with tempfile.TemporaryDirectory() as tempdir:
-                temp_path = os.path.join(tempdir, uploaded_file.name)
-                with open(temp_path, "wb") as f:
-                    f.write(uploaded_file.read())
-                try:
-                    excel_path = pipeline(temp_path, tempdir)
-                    if os.path.exists(excel_path):
-                        st.success("Processamento finalizado com sucesso!")
-                        st.download_button(
-                            label="📥 Baixar Excel consolidado",
-                            data=open(excel_path, "rb").read(),
-                            file_name="rotas_bh_dados_tratados_completos.xlsx",
-                            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                            key="download_excel_consolidado"
-                        )
-    
-                        import shutil
-                        shutil.copy(excel_path, "rotas_bh_dados_tratados_completos.xlsx")
-                    else:
-                        st.error("Arquivo final não encontrado. Ocorreu um erro no pipeline.")
-                except Exception as e:
-                    st.error(f"Erro no processamento: {e}")    
+        # Detecta arquivo novo pelo nome
+        if uploaded_file.name != st.session_state["rotas_uploaded_name"]:
+            with st.spinner("Processando... Isso pode levar alguns segundos."):
+                with tempfile.TemporaryDirectory() as tempdir:
+                    temp_path = os.path.join(tempdir, uploaded_file.name)
+                    with open(temp_path, "wb") as f:
+                        f.write(uploaded_file.read())
+                    try:
+                        excel_path = pipeline(temp_path, tempdir)
+                        if os.path.exists(excel_path):
+                            st.success("Processamento finalizado com sucesso!")
+                            # Salva nome para identificar que já processou
+                            st.session_state["rotas_uploaded_name"] = uploaded_file.name
+                            st.session_state["rotas_processed"] = True
+                            # Copia arquivo processado para local definitivo
+                            import shutil
+                            shutil.copy(excel_path, "rotas_bh_dados_tratados_completos.xlsx")
+                        else:
+                            st.session_state["rotas_processed"] = False
+                            st.error("Arquivo final não encontrado. Ocorreu um erro no pipeline.")
+                    except Exception as e:
+                        st.session_state["rotas_processed"] = False
+                        st.error(f"Erro no processamento: {e}")
+        else:
+            # Só mostra download, sem reprocessar
+            if st.session_state.get("rotas_processed", False) and os.path.exists("rotas_bh_dados_tratados_completos.xlsx"):
+                st.success("Arquivo já processado!")
+                st.download_button(
+                    label="📥 Baixar Excel consolidado",
+                    data=open("rotas_bh_dados_tratados_completos.xlsx", "rb").read(),
+                    file_name="rotas_bh_dados_tratados_completos.xlsx",
+                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                    key="download_excel_consolidado"
+                )
+    else:
+        st.info("Faça upload de um arquivo para começar.")
+   
 
 with tabs[2]:
     
