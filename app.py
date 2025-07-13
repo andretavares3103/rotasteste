@@ -705,7 +705,7 @@ def pipeline(file_path, output_dir):
             col += 1
         
         # 7️⃣ Complemento: Mais próximos (caso não tenha batido 20 colunas)
-        if col <= 20:
+        if col <= 10:
             dist_restantes = df_distancias[(df_distancias["CPF_CNPJ"] == cpf)].copy()
             dist_restantes = dist_restantes[~dist_restantes["ID Prestador"].isin(utilizados | set(bloqueados) | preferidas_alocadas_dia[data_atendimento])]
             dist_restantes = dist_restantes.sort_values("Distância (km)")
@@ -752,7 +752,7 @@ def pipeline(file_path, output_dir):
 
     
     df_matriz_rotas = pd.DataFrame(matriz_resultado_corrigida)
-    app_url = "https://rotasvavive.streamlit.app/"
+    app_url = "https://rotasteste-c9dzzfhuuhwv7ongodgrpq.streamlit.app/"
     df_matriz_rotas["Mensagem Padrão"] = df_matriz_rotas.apply(
         lambda row: f"👉 [Clique aqui para validar seu aceite]({app_url}?aceite={row['OS']})\n\n{row['Mensagem Padrão']}",
         axis=1
@@ -775,7 +775,7 @@ def pipeline(file_path, output_dir):
         "Duração do Serviço", "Hora de entrada","Observações prestador", "Ponto de Referencia", "Mensagem Padrão"
     ]
     prestador_cols = []
-    for i in range(1, 21):
+    for i in range(1, 11):
         prestador_cols.extend([
             f"Classificação da Profissional {i}",
             f"Critério {i}",
@@ -1045,7 +1045,7 @@ with tabs[2]:
         clientes = df_rotas["Nome Cliente"].dropna().unique()
         cliente_sel = st.selectbox("Filtrar por cliente", options=["Todos"] + list(clientes), key="cliente_rotas")
         profissionais = []
-        for i in range(1, 21):
+        for i in range(1, 11):
             profissionais.extend(df_rotas[f"Nome Prestador {i}"].dropna().unique())
         profissionais = list(set([p for p in profissionais if isinstance(p, str)]))
         profissional_sel = st.selectbox("Filtrar por profissional", options=["Todos"] + profissionais, key="prof_rotas")
@@ -1056,7 +1056,7 @@ with tabs[2]:
             df_rotas_filt = df_rotas_filt[df_rotas_filt["Nome Cliente"] == cliente_sel]
         if profissional_sel != "Todos":
             mask = False
-            for i in range(1, 21):
+            for i in range(1, 11):
                 mask |= (df_rotas_filt[f"Nome Prestador {i}"] == profissional_sel)
             df_rotas_filt = df_rotas_filt[mask]
         st.dataframe(df_rotas_filt, use_container_width=True)
@@ -1374,7 +1374,7 @@ with tabs[5]:
     hora_entrada = st.text_input("Hora de entrada (ex: 08:00)")
     duracao = st.text_input("Duração do atendimento (ex: 2h)")
 
-    app_url = "https://rotasvavive.streamlit.app"  # sua URL real
+    app_url = "https://rotasteste-c9dzzfhuuhwv7ongodgrpq.streamlit.app"  # sua URL real
     if os_id.strip():
         link_aceite = f"{app_url}?aceite={os_id}&origem=mensagem_rapida"
     else:
