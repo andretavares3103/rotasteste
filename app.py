@@ -1,4 +1,4 @@
-#
+
 
 import streamlit as st
 import pandas as pd
@@ -632,7 +632,7 @@ def pipeline(file_path, output_dir):
         dist_cand = dist_cand[~dist_cand["ID Prestador"].isin(utilizados | set(bloqueados) | preferidas_alocadas_dia[data_atendimento])]
         dist_cand = dist_cand.sort_values("Distância (km)")
         for _, dist_row in dist_cand.iterrows():
-            if col > 15:
+            if col > 10:
                 break
             prof = df_profissionais[df_profissionais["ID Prestador"].astype(str).str.strip() == str(dist_row["ID Prestador"])]
             if prof.empty:
@@ -671,7 +671,7 @@ def pipeline(file_path, output_dir):
         # 6️⃣ Sumidinhos/baixa disponibilidade
         sumidinhos_para_incluir = [sum_id for sum_id in df_sumidinhos["ID Prestador"].astype(str) if sum_id in utilizados]
         for sum_id in sumidinhos_para_incluir:
-            if col > 20:
+            if col > 10:
                 break
             if sum_id in bloqueados or sum_id in preferidas_alocadas_dia[data_atendimento]:
                 continue
@@ -710,7 +710,7 @@ def pipeline(file_path, output_dir):
             dist_restantes = dist_restantes[~dist_restantes["ID Prestador"].isin(utilizados | set(bloqueados) | preferidas_alocadas_dia[data_atendimento])]
             dist_restantes = dist_restantes.sort_values("Distância (km)")
             for _, dist_row in dist_restantes.iterrows():
-                if col > 20:
+                if col > 10:
                     break
                 prof = df_profissionais[df_profissionais["ID Prestador"].astype(str).str.strip() == str(dist_row["ID Prestador"])]
                 if prof.empty:
@@ -752,14 +752,14 @@ def pipeline(file_path, output_dir):
 
     
     df_matriz_rotas = pd.DataFrame(matriz_resultado_corrigida)
-    app_url = "https://TESTE.streamlit.app/"
+    app_url = "https://rotasvavive.streamlit.app/"
     df_matriz_rotas["Mensagem Padrão"] = df_matriz_rotas.apply(
         lambda row: f"👉 [Clique aqui para validar seu aceite]({app_url}?aceite={row['OS']})\n\n{row['Mensagem Padrão']}",
         axis=1
     )
 
     
-    for i in range(1, 21):
+    for i in range(1, 11):
         if f"Classificação da Profissional {i}" not in df_matriz_rotas.columns:
             df_matriz_rotas[f"Classificação da Profissional {i}"] = pd.NA
         if f"Critério {i}" not in df_matriz_rotas.columns:
@@ -902,27 +902,6 @@ if not st.session_state.admin_autenticado:
             os_list = json.load(f)
         df = df[~df["OS"].isna()]  # remove linhas totalmente vazias de OS
         df = df[pd.to_numeric(df["OS"], errors="coerce").isin(os_list)]
-    
-        # >>>>>> FILTRO PARA OCULTAR OS COM 3+ ACEITES 'portal' <<<<<<
-        if os.path.exists("aceites.xlsx"):
-            df_aceites = pd.read_excel("aceites.xlsx")
-            def limpa_os(val):
-                try:
-                    return str(int(float(str(val).strip())))
-                except:
-                    return str(val).strip()
-            df_aceites["OS"] = df_aceites["OS"].apply(limpa_os)
-            df["OS"] = df["OS"].apply(limpa_os)
-            filtro = (
-                df_aceites["Aceitou"].astype(str).str.strip().str.lower() == "sim"
-            ) & (
-                df_aceites["Origem"].astype(str).str.strip().str.lower() == "portal"
-            )
-            contagem = df_aceites[filtro].groupby("OS").size()
-            os_remover = contagem[contagem >= 3].index.tolist()
-            df = df[~df["OS"].isin(os_remover)]
-        # <<<<<< FIM DO FILTRO >>>>>>
-    
         if df.empty:
             st.info("Nenhum atendimento disponível.")
         else:
@@ -936,11 +915,8 @@ if not st.session_state.admin_autenticado:
                 hora_entrada = row.get("Hora de entrada", "")
                 hora_servico = row.get("Horas de serviço", "")
                 referencia = row.get("Ponto de Referencia", "")
-                try:
-                    os_id = int(float(row["OS"]))
-                except Exception:
-                    os_id = str(row["OS"]).strip()
-    
+                os_id = int(row["OS"])
+
                 st.markdown(f"""
                     <div style="
                         background: #fff;
@@ -969,6 +945,7 @@ if not st.session_state.admin_autenticado:
                 """, unsafe_allow_html=True)
                 expander_style = """
                 <style>
+                /* Aplica fundo verde e texto branco ao expander do Streamlit */
                 div[role="button"][aria-expanded] {
                     background: #25D366 !important;
                     color: #fff !important;
@@ -989,7 +966,6 @@ if not st.session_state.admin_autenticado:
     else:
         st.info("Nenhum atendimento disponível. Aguarde liberação do admin.")
 
-
     # ---- CAMPO DE SENHA para liberar as demais abas ----
     senha = st.text_input("Área restrita. Digite a senha para liberar as demais abas:", type="password")
     if st.button("Entrar", key="btn_senha_global"):
@@ -1007,19 +983,19 @@ if not st.session_state.admin_autenticado:
 tabs = st.tabs(["Portal Atendimentos", "Upload de Arquivo", "Matriz de Rotas", "Aceites", "Profissionais Próximos", "Mensagem Rápida"])
 
 with tabs[1]:
-    # Permite upload do arquivo
-    uploaded_file = st.file_uploader("Selecione o arquivo Excel original", type=["xlsx"], key="uploader_rotas")
+    if "excel_processado" not in st.session_state:
+        st.session_state.excel_processado = False
+    if "nome_arquivo_processado" not in st.session_state:
+        st.session_state.nome_arquivo_processado = None
 
-    # Checa se o arquivo já foi processado na sessão
-    if "rotas_uploaded_name" not in st.session_state:
-        st.session_state["rotas_uploaded_name"] = None
-    if "rotas_processed" not in st.session_state:
-        st.session_state["rotas_processed"] = False
+    uploaded_file = st.file_uploader("Selecione o arquivo Excel original", type=["xlsx"])
 
-    # Processa só se for um arquivo novo
-    if uploaded_file:
-        # Detecta arquivo novo pelo nome
-        if uploaded_file.name != st.session_state["rotas_uploaded_name"]:
+    # Só processa se o arquivo mudou ou nunca foi processado
+    if uploaded_file is not None:
+        if (
+            not st.session_state.excel_processado
+            or st.session_state.nome_arquivo_processado != uploaded_file.name
+        ):
             with st.spinner("Processando... Isso pode levar alguns segundos."):
                 with tempfile.TemporaryDirectory() as tempdir:
                     temp_path = os.path.join(tempdir, uploaded_file.name)
@@ -1029,22 +1005,24 @@ with tabs[1]:
                         excel_path = pipeline(temp_path, tempdir)
                         if os.path.exists(excel_path):
                             st.success("Processamento finalizado com sucesso!")
-                            # Salva nome para identificar que já processou
-                            st.session_state["rotas_uploaded_name"] = uploaded_file.name
-                            st.session_state["rotas_processed"] = True
-                            # Copia arquivo processado para local definitivo
+                            st.download_button(
+                                label="📥 Baixar Excel consolidado",
+                                data=open(excel_path, "rb").read(),
+                                file_name="rotas_bh_dados_tratados_completos.xlsx",
+                                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                                key="download_excel_consolidado"
+                            )
                             import shutil
                             shutil.copy(excel_path, "rotas_bh_dados_tratados_completos.xlsx")
+                            st.session_state.excel_processado = True
+                            st.session_state.nome_arquivo_processado = uploaded_file.name
                         else:
-                            st.session_state["rotas_processed"] = False
                             st.error("Arquivo final não encontrado. Ocorreu um erro no pipeline.")
                     except Exception as e:
-                        st.session_state["rotas_processed"] = False
-                        st.error(f"Erro no processamento: {e}")
+                        st.error(f"Erro no processamento: {e}") 
         else:
-            # Só mostra download, sem reprocessar
-            if st.session_state.get("rotas_processed", False) and os.path.exists("rotas_bh_dados_tratados_completos.xlsx"):
-                st.success("Arquivo já processado!")
+            # Já processado: só mostra o botão de download
+            if os.path.exists("rotas_bh_dados_tratados_completos.xlsx"):
                 st.download_button(
                     label="📥 Baixar Excel consolidado",
                     data=open("rotas_bh_dados_tratados_completos.xlsx", "rb").read(),
@@ -1053,8 +1031,10 @@ with tabs[1]:
                     key="download_excel_consolidado"
                 )
     else:
-        st.info("Faça upload de um arquivo para começar.")
-   
+        # Resetar caso usuário remova o arquivo
+        st.session_state.excel_processado = False
+        st.session_state.nome_arquivo_processado = None
+    
 
 with tabs[2]:
     
@@ -1394,7 +1374,7 @@ with tabs[5]:
     hora_entrada = st.text_input("Hora de entrada (ex: 08:00)")
     duracao = st.text_input("Duração do atendimento (ex: 2h)")
 
-    app_url = "https://rotasteste.streamlit.app"  # sua URL real
+    app_url = "https://rotasvavive.streamlit.app"  # sua URL real
     if os_id.strip():
         link_aceite = f"{app_url}?aceite={os_id}&origem=mensagem_rapida"
     else:
@@ -1418,3 +1398,4 @@ with tabs[5]:
                 "Se tiver interesse, por favor, nos avise!"
             )
             st.text_area("Mensagem WhatsApp", value=mensagem, height=260)
+
