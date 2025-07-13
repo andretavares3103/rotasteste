@@ -1217,7 +1217,7 @@ with tabs[0]:
     if st.button("Acesso admin para editar atendimentos do portal"):
         st.session_state.exibir_admin_portal = True
 
-    # BLOCO ADMIN
+    # --- BLOCO ADMIN (Tabs[0]) ---
     if st.session_state.exibir_admin_portal:
         senha = st.text_input("Digite a senha de administrador", type="password", key="senha_portal_admin")
         if st.button("Validar senha", key="btn_validar_senha_portal"):
@@ -1225,52 +1225,70 @@ with tabs[0]:
                 st.session_state.admin_autenticado_portal = True
             else:
                 st.error("Senha incorreta.")
-
+    
+        # Adiciona controle persistente para uso do último arquivo
+        if "use_last_file_portal" not in st.session_state:
+            st.session_state["use_last_file_portal"] = False
+    
         if st.session_state.admin_autenticado_portal:
-            # Permite upload OU reutilização do arquivo salvo
             uploaded_file = st.file_uploader("Faça upload do arquivo Excel", type=["xlsx"], key="portal_upload")
-            use_last_file = False
+            # Botão para reutilizar último arquivo
             if os.path.exists(PORTAL_EXCEL):
                 st.info("Você pode reutilizar o último arquivo salvo sem novo upload.")
                 if st.button("Usar último arquivo salvo para editar/exibir atendimentos"):
-                    use_last_file = True
-
+                    st.session_state["use_last_file_portal"] = True
+    
+            df = None
             if uploaded_file:
                 with open(PORTAL_EXCEL, "wb") as f:
                     f.write(uploaded_file.getbuffer())
                 st.success("Arquivo salvo! Escolha agora os atendimentos que ficarão visíveis.")
                 df = pd.read_excel(PORTAL_EXCEL, sheet_name="Clientes")
-            elif use_last_file and os.path.exists(PORTAL_EXCEL):
+                st.session_state["use_last_file_portal"] = False
+            elif st.session_state["use_last_file_portal"] and os.path.exists(PORTAL_EXCEL):
                 df = pd.read_excel(PORTAL_EXCEL, sheet_name="Clientes")
             else:
                 df = None
-
+    
             if df is not None:
-                # ------- FILTRO POR DATA1 -------
+                # Filtros de datas
                 datas_disponiveis = sorted(df["Data 1"].dropna().unique())
                 datas_formatadas = [str(pd.to_datetime(d).date()) for d in datas_disponiveis]
+                # Persistir seleção de datas
+                if "datas_multiselect" not in st.session_state:
+                    st.session_state["datas_multiselect"] = []
+    
                 datas_selecionadas = st.multiselect(
                     "Filtrar atendimentos por Data",
                     options=datas_formatadas,
-                    default=[],
+                    default=st.session_state["datas_multiselect"],
                     key="datas_multiselect"
                 )
+                st.session_state["datas_multiselect"] = datas_selecionadas
+    
                 if datas_selecionadas:
                     df = df[df["Data 1"].astype(str).apply(lambda d: str(pd.to_datetime(d).date()) in datas_selecionadas)]
-
-                # Monta opções com OS, Cliente, Serviço e Bairro
+    
+                # Monta opções de atendimento
                 opcoes = [
                     f'OS {int(row.OS)} | {row["Cliente"]} | {row.get("Serviço", "")} | {row.get("Bairro", "")}'
                     for _, row in df.iterrows()
                     if not pd.isnull(row.OS)
                 ]
+                # Persistir seleção de atendimentos
+                if "os_multiselect" not in st.session_state:
+                    st.session_state["os_multiselect"] = []
+    
                 selecionadas = st.multiselect(
                     "Selecione os atendimentos para exibir (OS | Cliente | Serviço | Bairro)",
                     opcoes,
+                    default=st.session_state["os_multiselect"],
                     key="os_multiselect"
                 )
+                st.session_state["os_multiselect"] = selecionadas
+    
+                # O botão sempre aparece enquanto o df está carregado!
                 if st.button("Salvar atendimentos exibidos", key="salvar_os_btn"):
-                    # Para salvar apenas a lista de OS selecionadas (extraindo da string)
                     os_ids = [
                         int(op.split()[1]) for op in selecionadas
                         if op.startswith("OS ")
@@ -1280,7 +1298,9 @@ with tabs[0]:
                     st.success("Seleção salva! Agora os atendimentos já ficam disponíveis a todos.")
                     st.session_state.exibir_admin_portal = False
                     st.session_state.admin_autenticado_portal = False
+                    st.session_state["use_last_file_portal"] = False
                     st.rerun()
+
 
     # BLOCO VISUALIZAÇÃO (PÚBLICO)
     if not st.session_state.exibir_admin_portal:
