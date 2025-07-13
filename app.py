@@ -902,6 +902,27 @@ if not st.session_state.admin_autenticado:
             os_list = json.load(f)
         df = df[~df["OS"].isna()]  # remove linhas totalmente vazias de OS
         df = df[pd.to_numeric(df["OS"], errors="coerce").isin(os_list)]
+    
+        # >>>>>> FILTRO PARA OCULTAR OS COM 3+ ACEITES 'portal' <<<<<<
+        if os.path.exists("aceites.xlsx"):
+            df_aceites = pd.read_excel("aceites.xlsx")
+            def limpa_os(val):
+                try:
+                    return str(int(float(str(val).strip())))
+                except:
+                    return str(val).strip()
+            df_aceites["OS"] = df_aceites["OS"].apply(limpa_os)
+            df["OS"] = df["OS"].apply(limpa_os)
+            filtro = (
+                df_aceites["Aceitou"].astype(str).str.strip().str.lower() == "sim"
+            ) & (
+                df_aceites["Origem"].astype(str).str.strip().str.lower() == "portal"
+            )
+            contagem = df_aceites[filtro].groupby("OS").size()
+            os_remover = contagem[contagem >= 3].index.tolist()
+            df = df[~df["OS"].isin(os_remover)]
+        # <<<<<< FIM DO FILTRO >>>>>>
+    
         if df.empty:
             st.info("Nenhum atendimento disponível.")
         else:
@@ -915,8 +936,11 @@ if not st.session_state.admin_autenticado:
                 hora_entrada = row.get("Hora de entrada", "")
                 hora_servico = row.get("Horas de serviço", "")
                 referencia = row.get("Ponto de Referencia", "")
-                os_id = int(row["OS"])
-
+                try:
+                    os_id = int(float(row["OS"]))
+                except Exception:
+                    os_id = str(row["OS"]).strip()
+    
                 st.markdown(f"""
                     <div style="
                         background: #fff;
@@ -945,7 +969,6 @@ if not st.session_state.admin_autenticado:
                 """, unsafe_allow_html=True)
                 expander_style = """
                 <style>
-                /* Aplica fundo verde e texto branco ao expander do Streamlit */
                 div[role="button"][aria-expanded] {
                     background: #25D366 !important;
                     color: #fff !important;
@@ -965,6 +988,7 @@ if not st.session_state.admin_autenticado:
                         resposta.success("✅ Obrigado! Seu interesse foi registrado com sucesso. Em breve daremos retorno sobre o atendimento!")
     else:
         st.info("Nenhum atendimento disponível. Aguarde liberação do admin.")
+
 
     # ---- CAMPO DE SENHA para liberar as demais abas ----
     senha = st.text_input("Área restrita. Digite a senha para liberar as demais abas:", type="password")
