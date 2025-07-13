@@ -1199,17 +1199,18 @@ with tabs[0]:
         </p>
         """, unsafe_allow_html=True)
 
-    # Controle de exibição/admin
+    # Inicialização dos controles
     if "exibir_admin_portal" not in st.session_state:
         st.session_state.exibir_admin_portal = False
     if "admin_autenticado_portal" not in st.session_state:
         st.session_state.admin_autenticado_portal = False
 
+    # Botão para admin
     if st.button("Acesso admin para editar atendimentos do portal"):
         st.session_state.exibir_admin_portal = True
 
-    # ---- BLOCO ADMIN ----
-    if st.session_state.exibir_admin_portal:
+    # ---- BLOCO ADMIN (aberto quando botão clicado OU senha validada) ----
+    if st.session_state.exibir_admin_portal or st.session_state.admin_autenticado_portal:
         senha = st.text_input("Digite a senha de administrador", type="password", key="senha_portal_admin")
         if st.button("Validar senha", key="btn_validar_senha_portal"):
             if senha == "vvv":
@@ -1256,8 +1257,8 @@ with tabs[0]:
                     st.session_state.admin_autenticado_portal = False
                     st.rerun()
 
-    # ---- BLOCO VISUALIZAÇÃO (PÚBLICO) ----
-    if not st.session_state.exibir_admin_portal:
+    # ---- BLOCO PÚBLICO (apenas quando NÃO está no admin nem autenticado) ----
+    if not st.session_state.exibir_admin_portal and not st.session_state.admin_autenticado_portal:
         if os.path.exists(PORTAL_EXCEL) and os.path.exists(PORTAL_OS_LIST):
             df = pd.read_excel(PORTAL_EXCEL, sheet_name="Clientes")
             with open(PORTAL_OS_LIST, "r") as f:
@@ -1265,19 +1266,16 @@ with tabs[0]:
             df = df[~df["OS"].isna()]
             df = df[pd.to_numeric(df["OS"], errors="coerce").isin(os_list)]
 
-            # >>> FILTRO PARA OCULTAR OS COM 3+ ACEITES (SÓ NO MODO PÚBLICO!) <<<
+            # >>> FILTRO PARA OCULTAR OS COM 3+ ACEITES DE ORIGEM 'PORTAL' <<<
             if os.path.exists("aceites.xlsx"):
                 df_aceites = pd.read_excel("aceites.xlsx")
-
                 def limpa_os(val):
                     try:
                         return str(int(float(str(val).strip())))
                     except:
                         return str(val).strip()
-
                 df_aceites["OS"] = df_aceites["OS"].apply(limpa_os)
                 df["OS"] = df["OS"].apply(limpa_os)
-
                 filtro = (
                     df_aceites["Aceitou"].astype(str).str.strip().str.lower() == "sim"
                 ) & (
@@ -1293,7 +1291,6 @@ with tabs[0]:
             else:
                 st.write(f"Exibindo {len(df)} atendimentos selecionados pelo administrador:")
                 for _, row in df.iterrows():
-                    # Conversão robusta do OS para usar como chave/widget
                     os_str = str(row["OS"]).strip()
                     try:
                         os_id = int(float(os_str))
@@ -1357,6 +1354,7 @@ with tabs[0]:
                             resposta.success("✅ Obrigado! Seu interesse foi registrado com sucesso. Em breve daremos retorno sobre o atendimento!")
         else:
             st.info("Nenhum atendimento disponível. Aguarde liberação do admin.")
+
 
 
 
