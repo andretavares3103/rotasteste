@@ -1246,9 +1246,11 @@ with tabs[0]:
                     with open(PORTAL_OS_LIST, "r") as f:
                         os_ids_salvos = json.load(f)
                     opcoes = [
-                        f'OS {int(row.OS)} | {row["Cliente"]} | {row.get("Serviço", "")} | {row.get("Bairro", "")}'
+                        f'OS {int(float(row.OS))} | {row["Cliente"]} | {row.get("Serviço", "")} | {row.get("Bairro", "")}'
                         for _, row in df.iterrows()
                         if not pd.isnull(row.OS)
+                        and str(row.OS).strip() not in ["", "nan"]
+                        and str(row.OS).replace('.', '', 1).isdigit()
                     ]
                     # Seleção automática dos atendimentos já salvos
                     selecionadas_default = [
@@ -1285,7 +1287,7 @@ with tabs[0]:
                     os_ids = []
                     for op in selecionadas:
                         try:
-                            os_ids.append(int(op.split()[1]))
+                            os_ids.append(int(float(op.split()[1])))
                         except Exception:
                             continue
                     with open(PORTAL_OS_LIST, "w") as f:
