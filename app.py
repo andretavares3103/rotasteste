@@ -1275,7 +1275,11 @@ with tabs[0]:
             # >>>>>>>>>>>> FILTRO PARA ESCONDER OS COM 3+ ACEITES 'portal' <<<<<<<<<<<
             if os.path.exists("aceites.xlsx"):
                 df_aceites = pd.read_excel("aceites.xlsx")
-                df_aceites["OS"] = df_aceites["OS"].astype(str).str.strip()
+            
+                # Padronize a coluna OS dos dois DataFrames para string SEM espaços nem zeros à esquerda
+                df_aceites["OS"] = df_aceites["OS"].astype(str).str.strip().str.lstrip("0")
+                df["OS"] = df["OS"].astype(str).str.strip().str.lstrip("0")
+            
                 # Aceites 'Sim' de origem 'portal'
                 filtro = (
                     df_aceites["Aceitou"].astype(str).str.strip().str.lower() == "sim"
@@ -1284,7 +1288,9 @@ with tabs[0]:
                 )
                 contagem = df_aceites[filtro].groupby("OS").size()
                 # Remove do DataFrame as OS com 3 ou mais aceites
-                df = df[~df["OS"].astype(str).isin(contagem[contagem >= 3].index)]
+                os_remover = contagem[contagem >= 3].index.tolist()
+                df = df[~df["OS"].isin(os_remover)]
+
             # <<<<<<<<<<<<<<< FIM DO FILTRO <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
 
             if df.empty:
