@@ -1262,10 +1262,12 @@ def safe_os_id(val):
                         df = df[df["Data 1"].astype(str).apply(lambda d: str(pd.to_datetime(d).date()) in datas_selecionadas)]
     
                     # Monta opções com OS, Cliente, Serviço e Bairro
-                    opcoes = [
-                        f'OS {safe_os_id(row.OS)} | {row["Cliente"]} | {row.get("Serviço", "")} | {row.get("Bairro", "")}'
-                        for _, row in df.iterrows()
-                        if not pd.isnull(row.OS)
+                    opcoes = []
+                    for _, row in df.iterrows():
+                        os_id = safe_os_id(row.OS)
+                        if os_id is not None:
+                            opcoes.append(f'OS {os_id} | {row["Cliente"]} | {row.get("Serviço", "")} | {row.get("Bairro", "")}')
+
                     ]
                     # Recupera seleção anterior, se houver
                     if "os_multiselect" not in st.session_state:
