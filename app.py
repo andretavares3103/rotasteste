@@ -1199,13 +1199,12 @@ with tabs[0]:
         </p>
         """, unsafe_allow_html=True)
 
-    # Controle de exibição e autenticação admin
+    # Controle de exibição/admin
     if "exibir_admin_portal" not in st.session_state:
         st.session_state.exibir_admin_portal = False
     if "admin_autenticado_portal" not in st.session_state:
         st.session_state.admin_autenticado_portal = False
 
-    # Botão para mostrar a área admin
     if st.button("Acesso admin para editar atendimentos do portal"):
         st.session_state.exibir_admin_portal = True
 
@@ -1225,8 +1224,6 @@ with tabs[0]:
                     f.write(uploaded_file.getbuffer())
                 st.success("Arquivo salvo! Escolha agora os atendimentos que ficarão visíveis.")
                 df = pd.read_excel(PORTAL_EXCEL, sheet_name="Clientes")
-
-                # ------- FILTRO POR DATA1 -------
                 datas_disponiveis = sorted(df["Data 1"].dropna().unique())
                 datas_formatadas = [str(pd.to_datetime(d).date()) for d in datas_disponiveis]
                 datas_selecionadas = st.multiselect(
@@ -1237,8 +1234,6 @@ with tabs[0]:
                 )
                 if datas_selecionadas:
                     df = df[df["Data 1"].astype(str).apply(lambda d: str(pd.to_datetime(d).date()) in datas_selecionadas)]
-
-                # Monta opções com OS, Cliente, Serviço e Bairro
                 opcoes = [
                     f'OS {int(row.OS)} | {row["Cliente"]} | {row.get("Serviço", "")} | {row.get("Bairro", "")}'
                     for _, row in df.iterrows()
@@ -1250,7 +1245,6 @@ with tabs[0]:
                     key="os_multiselect"
                 )
                 if st.button("Salvar atendimentos exibidos", key="salvar_os_btn"):
-                    # Para salvar apenas a lista de OS selecionadas (extraindo da string)
                     os_ids = [
                         int(op.split()[1]) for op in selecionadas
                         if op.startswith("OS ")
@@ -1268,25 +1262,22 @@ with tabs[0]:
             df = pd.read_excel(PORTAL_EXCEL, sheet_name="Clientes")
             with open(PORTAL_OS_LIST, "r") as f:
                 os_list = json.load(f)
-            # Só exibe OS selecionadas
-            df = df[~df["OS"].isna()]  # remove linhas totalmente vazias de OS
+            df = df[~df["OS"].isna()]
             df = df[pd.to_numeric(df["OS"], errors="coerce").isin(os_list)]
 
-            # >>>>>>>>>>>> FILTRO PARA ESCONDER OS COM 3+ ACEITES 'portal' <<<<<<<<<<<
+            # >>> FILTRO PARA OCULTAR OS COM 3+ ACEITES (SÓ NO MODO PÚBLICO!) <<<
             if os.path.exists("aceites.xlsx"):
                 df_aceites = pd.read_excel("aceites.xlsx")
-            
-                # Padroniza OS como string sem espaços e sem zeros à esquerda
+
                 def limpa_os(val):
                     try:
                         return str(int(float(str(val).strip())))
                     except:
                         return str(val).strip()
-            
+
                 df_aceites["OS"] = df_aceites["OS"].apply(limpa_os)
                 df["OS"] = df["OS"].apply(limpa_os)
-            
-                # Conta só aceites SIM e origem 'portal'
+
                 filtro = (
                     df_aceites["Aceitou"].astype(str).str.strip().str.lower() == "sim"
                 ) & (
@@ -1295,15 +1286,20 @@ with tabs[0]:
                 contagem = df_aceites[filtro].groupby("OS").size()
                 os_remover = contagem[contagem >= 3].index.tolist()
                 df = df[~df["OS"].isin(os_remover)]
-
-
-            # <<<<<<<<<<<<<<< FIM DO FILTRO <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+            # <<< FIM DO FILTRO >>>
 
             if df.empty:
                 st.info("Nenhum atendimento disponível.")
             else:
                 st.write(f"Exibindo {len(df)} atendimentos selecionados pelo administrador:")
                 for _, row in df.iterrows():
+                    # Conversão robusta do OS para usar como chave/widget
+                    os_str = str(row["OS"]).strip()
+                    try:
+                        os_id = int(float(os_str))
+                    except Exception:
+                        os_id = os_str
+
                     servico = row.get("Serviço", "")
                     nome_cliente = row.get("Cliente", "")
                     bairro = row.get("Bairro", "")
@@ -1311,12 +1307,6 @@ with tabs[0]:
                     hora_entrada = row.get("Hora de entrada", "")
                     hora_servico = row.get("Horas de serviço", "")
                     referencia = row.get("Ponto de Referencia", "")
-                    os_str = str(row["OS"]).strip()
-                    try:
-                        os_id = int(float(os_str))  # Converte strings como '123.0', '123', ' 0123 ' etc
-                    except Exception:
-                        os_id = os_str  # Se não der pra converter, deixa como string mesmo
-
 
                     st.markdown(f"""
                         <div style="
@@ -1367,6 +1357,7 @@ with tabs[0]:
                             resposta.success("✅ Obrigado! Seu interesse foi registrado com sucesso. Em breve daremos retorno sobre o atendimento!")
         else:
             st.info("Nenhum atendimento disponível. Aguarde liberação do admin.")
+
 
 
 with tabs[4]:
