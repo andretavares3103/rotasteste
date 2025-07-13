@@ -1207,99 +1207,80 @@ with tabs[0]:
         </p>
         """, unsafe_allow_html=True)
 
+    # Controle de exibição e autenticação admin
     if "exibir_admin_portal" not in st.session_state:
         st.session_state.exibir_admin_portal = False
     if "admin_autenticado_portal" not in st.session_state:
         st.session_state.admin_autenticado_portal = False
 
+    # Botão para mostrar a área admin
     if st.button("Acesso admin para editar atendimentos do portal"):
         st.session_state.exibir_admin_portal = True
 
-        # ---- BLOCO ADMIN ----
-    if st.session_state.get("exibir_admin_portal", False):
+    # BLOCO ADMIN
+    if st.session_state.exibir_admin_portal:
         senha = st.text_input("Digite a senha de administrador", type="password", key="senha_portal_admin")
         if st.button("Validar senha", key="btn_validar_senha_portal"):
             if senha == "vvv":
                 st.session_state.admin_autenticado_portal = True
             else:
                 st.error("Senha incorreta.")
-    
-        if st.session_state.get("admin_autenticado_portal", False):
+
+        if st.session_state.admin_autenticado_portal:
+            # Permite upload OU reutilização do arquivo salvo
             uploaded_file = st.file_uploader("Faça upload do arquivo Excel", type=["xlsx"], key="portal_upload")
+            use_last_file = False
+            if os.path.exists(PORTAL_EXCEL):
+                st.info("Você pode reutilizar o último arquivo salvo sem novo upload.")
+                if st.button("Usar último arquivo salvo para editar/exibir atendimentos"):
+                    use_last_file = True
+
             if uploaded_file:
                 with open(PORTAL_EXCEL, "wb") as f:
                     f.write(uploaded_file.getbuffer())
                 st.success("Arquivo salvo! Escolha agora os atendimentos que ficarão visíveis.")
-                st.session_state.portal_df = pd.read_excel(PORTAL_EXCEL, sheet_name="Clientes")
-            elif os.path.exists(PORTAL_EXCEL):
-                st.session_state.portal_df = pd.read_excel(PORTAL_EXCEL, sheet_name="Clientes")
-    
-            if "portal_df" in st.session_state:
-                df = st.session_state.portal_df
-                # Filtragem de datas (recupera seleção anterior, se houver)
+                df = pd.read_excel(PORTAL_EXCEL, sheet_name="Clientes")
+            elif use_last_file and os.path.exists(PORTAL_EXCEL):
+                df = pd.read_excel(PORTAL_EXCEL, sheet_name="Clientes")
+            else:
+                df = None
+
+            if df is not None:
+                # ------- FILTRO POR DATA1 -------
                 datas_disponiveis = sorted(df["Data 1"].dropna().unique())
                 datas_formatadas = [str(pd.to_datetime(d).date()) for d in datas_disponiveis]
-    
-                # Recupera última seleção, se existir
-                if os.path.exists(PORTAL_OS_LIST):
-                    import json
-                    with open(PORTAL_OS_LIST, "r") as f:
-                        os_ids_salvos = json.load(f)
-                    opcoes = [
-                        f'OS {int(row.OS)} | {row["Cliente"]} | {row.get("Serviço", "")} | {row.get("Bairro", "")}'
-                        for _, row in df.iterrows()
-                        if not pd.isnull(row.OS)
-                    ]
-                    # Seleção automática dos atendimentos já salvos
-                    selecionadas_default = [
-                        op for op in opcoes
-                        if int(op.split()[1]) in os_ids_salvos
-                    ]
-                else:
-                    selecionadas_default = []
-    
                 datas_selecionadas = st.multiselect(
                     "Filtrar atendimentos por Data",
                     options=datas_formatadas,
-                    default=datas_formatadas,  # Já vem tudo marcado
+                    default=[],
                     key="datas_multiselect"
                 )
                 if datas_selecionadas:
                     df = df[df["Data 1"].astype(str).apply(lambda d: str(pd.to_datetime(d).date()) in datas_selecionadas)]
-    
+
+                # Monta opções com OS, Cliente, Serviço e Bairro
                 opcoes = [
                     f'OS {int(row.OS)} | {row["Cliente"]} | {row.get("Serviço", "")} | {row.get("Bairro", "")}'
                     for _, row in df.iterrows()
                     if not pd.isnull(row.OS)
                 ]
-    
                 selecionadas = st.multiselect(
                     "Selecione os atendimentos para exibir (OS | Cliente | Serviço | Bairro)",
                     opcoes,
-                    default=selecionadas_default,
                     key="os_multiselect"
                 )
-    
-                # Salvar seleção
                 if st.button("Salvar atendimentos exibidos", key="salvar_os_btn"):
-                    os_ids = []
-                    for op in selecionadas:
-                        try:
-                            os_ids.append(int(op.split()[1]))
-                        except Exception:
-                            continue
+                    # Para salvar apenas a lista de OS selecionadas (extraindo da string)
+                    os_ids = [
+                        int(op.split()[1]) for op in selecionadas
+                        if op.startswith("OS ")
+                    ]
                     with open(PORTAL_OS_LIST, "w") as f:
                         json.dump(os_ids, f)
-                    st.success("Seleção salva! Os atendimentos já ficam disponíveis a todos.")
-                    # Não dá rerun, apenas mensagem de sucesso
-                    # Mantém modo admin ATIVO
-    
-                if st.button("Sair do modo admin"):
+                    st.success("Seleção salva! Agora os atendimentos já ficam disponíveis a todos.")
                     st.session_state.exibir_admin_portal = False
                     st.session_state.admin_autenticado_portal = False
-                    st.experimental_rerun()
-
-
+                    st.rerun()
 
     # BLOCO VISUALIZAÇÃO (PÚBLICO)
     if not st.session_state.exibir_admin_portal:
@@ -1364,6 +1345,7 @@ with tabs[0]:
                     
                     expander_style = """
                     <style>
+                    /* Aplica fundo verde e texto branco ao expander do Streamlit */
                     div[role="button"][aria-expanded] {
                         background: #25D366 !important;
                         color: #fff !important;
