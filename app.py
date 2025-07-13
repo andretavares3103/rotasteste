@@ -998,7 +998,6 @@ if st.button("Entrar", key="btn_senha_global"):
     else:
         st.error("Senha incorreta. Acesso restrito.")
 
-st.stop()
 
 
 
