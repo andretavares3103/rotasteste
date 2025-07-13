@@ -1383,7 +1383,7 @@ with tabs[5]:
     hora_entrada = st.text_input("Hora de entrada (ex: 08:00)")
     duracao = st.text_input("Duração do atendimento (ex: 2h)")
 
-    app_url = "https://rotasteste.streamlit.app"  # sua URL real
+    app_url = "https://rotasteste-c9dzzfhuuhwv7ongodgrpq.streamlit.app"  # sua URL real
     if os_id.strip():
         link_aceite = f"{app_url}?aceite={os_id}&origem=mensagem_rapida"
     else:
