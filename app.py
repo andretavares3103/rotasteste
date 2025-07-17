@@ -13,8 +13,8 @@ import smtplib
 from email.mime.text import MIMEText
 
 def enviar_email_aceite_gmail(os_id, profissional, telefone):
-    remetente = "bh.savassi@vavive.com.br"  # <-- seu e-mail de envio
-    senha = ".bhsavassi@123"        # <-- sua senha de app do Gmail
+    remetente = "andre.mtavares1@gmail.com"  # <-- seu e-mail de envio
+    senha = "3473010803474"        # <-- sua senha de app do Gmail
     destinatario = "bh.savassi@vavive.com.br"
 
     assunto = f"Novo aceite registrado | OS {os_id}"
