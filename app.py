@@ -9,6 +9,38 @@ from geopy.distance import geodesic
 import tempfile
 import io
 
+import smtplib
+from email.mime.text import MIMEText
+
+def enviar_email_aceite_gmail(os_id, profissional, telefone):
+    remetente = "bh.savassi@vavive.com.br"  # <-- seu e-mail de envio
+    senha = ".bhsavassi@123"        # <-- sua senha de app do Gmail
+    destinatario = "bh.savassi@vavive.com.br"
+
+    assunto = f"Novo aceite registrado | OS {os_id}"
+    corpo = f"""
+    Um novo aceite foi registrado:
+    
+    OS: {os_id}
+    Profissional: {profissional}
+    Telefone: {telefone}
+    Data/Hora: [inserir data/hora se quiser]
+    """
+
+    msg = MIMEText(corpo)
+    msg['Subject'] = assunto
+    msg['From'] = remetente
+    msg['To'] = destinatario
+
+    try:
+        with smtplib.SMTP_SSL('smtp.gmail.com', 465) as smtp:
+            smtp.login(remetente, senha)
+            smtp.sendmail(remetente, destinatario, msg.as_string())
+        print("Alerta de aceite enviado por e-mail!")
+    except Exception as e:
+        print("Erro ao enviar e-mail:", e)
+
+
 PORTAL_EXCEL = "portal_atendimentos_clientes.xlsx"  # ou o nome correto do seu arquivo de clientes
 PORTAL_OS_LIST = "portal_atendimentos_os_list.json" # ou o nome correto da lista de OS (caso use JSON, por exemplo)
 
@@ -71,6 +103,9 @@ def salvar_aceite(os_id, profissional, telefone, aceitou, origem=None):
     }
     df = pd.concat([df, pd.DataFrame([nova_linha])], ignore_index=True)
     df.to_excel(ACEITES_FILE, index=False)
+
+  # >>> Envio de alerta por e-mail <<<
+    enviar_email_aceite_gmail(os_id, profissional, telefone)
 
 aceite_os = st.query_params.get("aceite", None)
 origem_aceite = st.query_params.get("origem", None)
