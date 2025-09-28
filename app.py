@@ -1673,7 +1673,7 @@ with tabs[0]:
                     
                     with st.expander("Tem disponibilidade? Clique aqui para aceitar este atendimento!"):
                         profissional = st.text_input(f"Nome da Profissional (OBRIGATORIO)", key=f"prof_nome_{os_id}")
-                        telefone = st.text_input(f"Telefone para contato (OBRIGATORIO)", key=f"prof_tel_{os_id}")
+                        telefone = st.text_input(f"Telefone para contato. APENAS NUMEROS 3199999999. (OBRIGATORIO)", key=f"prof_tel_{os_id}")
                         resposta = st.empty()
 
                         # (NOVO) obrigatoriedade também neste card (aba Portal)
@@ -1838,6 +1838,7 @@ with tabs[6]:
             total_linhas = len(df_view)
             divergentes = int(df_view["Divergência"].sum()) if "Divergência" in df_view else 0
             st.caption(f"Linhas exibidas: {total_linhas} | Divergências: {divergentes}")
+
 
 
 
